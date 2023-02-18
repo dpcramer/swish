@@ -8,7 +8,6 @@ class PbpPlayersByEventHandler:
     def __init__(self, pbp_players_by_event):
         self.pbp_players_by_event = pbp_players_by_event
         self.last_play_id = None
-        self.event_plays = {}
         self.lineup = []
         self.insert_data = []
 
@@ -16,7 +15,6 @@ class PbpPlayersByEventHandler:
         for play in self.pbp_players_by_event:
             if play['play_id'] == 1:
                 self.lineup.append(play['player_id'])
-                pass
             else:
                 break
 
@@ -25,6 +23,21 @@ class PbpPlayersByEventHandler:
             insert_record = (play['event_id'], play['play_id'], player)
             self.insert_data.append(insert_record)
         self.last_play_id = play['play_id']
+
+
+class MysqlClient:
+    def __init__(self):
+        load_dotenv()
+        database_user = os.environ.get('DB_USERNAME')
+        database = os.environ.get('DB_NAME')
+        database_password = os.environ.get('DB_PASSWORD')
+        self.cnx = mysql.connector.connect(user=database_user, database=database, password=database_password)
+        self.cursor = self.cnx.cursor()
+
+    def write_records(self):
+        self.cnx.commit()
+        self.cursor.close()
+        self.cnx.close()
 
 
 if __name__ == "__main__":
@@ -62,20 +75,11 @@ if __name__ == "__main__":
             if play['play_id'] > event_handler.last_play_id:
                 event_handler.create_player_rows_per_play(play)
 
-        load_dotenv()
-        database_user = os.environ.get('DB_USERNAME')
-        database = os.environ.get('DB_NAME')
-        database_password = os.environ.get('DB_PASSWORD')
-        cnx = mysql.connector.connect(user=database_user, database=database, password=database_password)
-        cursor = cnx.cursor()
-
+        sql_client = MysqlClient()
         for play in event_handler.insert_data:
             add_game = ("INSERT INTO pbp_players_on_court "
                         "(event_id, play_id, player_id) "
                         "VALUES (%s, %s, %s)")
-            cursor.execute(add_game, play)
+            sql_client.cursor.execute(add_game, play)
+        sql_client.write_records()
 
-        row_count = cursor.lastrowid
-        cnx.commit()
-        cursor.close()
-        cnx.close()
