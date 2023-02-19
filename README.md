@@ -60,3 +60,6 @@ If this were to be productionalized and running against an api, I would, at a mi
 
 ## Database Connections
 I am not very not pleased with having multiple MySQL clients and connection strings that stay open for varying amounts of time. But again, this goes back to the design decision of updates to catch changes vs. bulk imports. If we are okay using a bulk import process, those would go away immediately. If not, I'm sure that there are significant improvements that can be made.
+
+## Exception Handling & logging
+Speaking of databases, once we get to the point of no longer running on a local server, try/catch handling will be essential.
