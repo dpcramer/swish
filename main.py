@@ -18,7 +18,6 @@ class PbpPlayersByEventHandler:
         self.set_starting_lineups()
         self.sql_client = MysqlClient()
         self.hashing_sql_client = MysqlClient()
-        df = {'event_id': [], 'play_id': [], 'team_id': [], 'player_id': [], 'is_anomaly': []}
         self.players_on_court_insert_data = []
 
     def set_team_ids(self):
@@ -84,7 +83,6 @@ class PbpPlayersByEventHandler:
     def update_and_delete_changed_data_from_database(self, play: dict, team_id: int, lineup_hash: int):
         event_id = play['event_id']
         play_id = play['play_id']
-        # print('updating data store')
         update_hash = f"update players_on_court_hash set lineup_hash = {lineup_hash} where event_id = {event_id} and play_id = {play_id} and team_id = {team_id}"
         event_handler.hashing_sql_client.cursor.execute(update_hash)
         event_handler.hashing_sql_client.cnx.commit()
@@ -96,11 +94,9 @@ class PbpPlayersByEventHandler:
     def run_hash_comparisons_for_team_and_play(self, play: dict, current_lineup_hash: hash, stored_hash_record: hash, team_id: int):
         # skip if the stored lineup hash matches the new lineup hash
         if len(stored_hash_record) > 0 and stored_hash_record == current_lineup_hash:
-            # print('no change - skipping play')
             return 'skip'
         # if no hash exists, write the current hash
         if len(stored_hash_record) == 0:
-            # print('no hash exists - adding')
             event_handler.write_hash_to_database(play, team_id, current_lineup_hash)
             return 'update'
         # If not equal, delete all records for play and update hash
