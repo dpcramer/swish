@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 class PbpPlayersByEventHandler:
     def __init__(self, pbp_players_by_event):
         self.pbp_players_by_event = pbp_players_by_event
-        self.last_play_id = None
         self.home_team = None
         self.away_team = None
         self.teams = []
@@ -162,7 +161,7 @@ if __name__ == "__main__":
         for play in event_handler.pbp_players_by_event:
 
             # Handle lineup for initial play
-            if play['play_id'] == 1 and play['play_sequence'] == 1 and event_handler.last_play_id is None:
+            if play['play_id'] == 1 and play['play_sequence'] == 1:
                 event_handler.compare_and_update_home_and_away_hashes(play)
 
             # Handle records that didn't have team_id
