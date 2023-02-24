@@ -1,5 +1,11 @@
 # PBP_Players_On_Court
-To run
+To run the program, you must have the pbp_players.xlsx file in your home directory, along with a .env using the .env.example as a guide:
+
+$ python main.py
+
+You may pass a event_id as an argument to process only a single game:
+
+$ python main.py 1947160
 
 ## Data Structure
 I'm assuming that the destination warehouse will have raw data tables for all three files: pbp_players, pbp, and rosters. To make aggregate functions as easy possible, I am inserting an entry into the table for each event_id-play_id-player_id combination.
@@ -47,13 +53,13 @@ Initial loading of the Excel files is handled via Pandas, as well as the initial
 ## Data Issues
 Given that the data quality concerns are a known issue and part of the problem, I think that the compromise of using non-substitution records to find missing players and flagging any anomalous data to be reasonable. If facing this problem in a real world situation my first response would be to try to fix the data source. Failing that, the next step would be to look for complementary data that could fill in the gaps.
 
-##Updates
+##Updates vs. Destroy & Rebuild
 The hashing component feels like overkill, but it's the solution that seemed most in line with the requirement 'When the script is run a second time, it updates the new table to catch any new changes.'
 It's a curated dataset compiled by professionals; as such, the greatest value comes from the data being complete and accurate. If changes do happen to the data, it's generally because a human made a mistake originally and has since corrected it. 
 
 I would want to confirm that idea with my data scientists, but if they agreed with that assessment, I would push for a fully batched job that would treat each event run as a new set of data. To preserve history, data from previous runs would be marked 'Inactive'.
 
-I believe that change would drastically reduce the code complexity while significantly improving the maintainability and performance of the job.
+I believe that change would drastically reduce the code complexity while significantly improving the maintainability and performance of the job. That being said, with the hash checks on a local db server it only takes about 5 seconds to run, so performance isn't a huge concern (code complexity is, though).
 
 ## Data Classes
 If this were to be productionalized and running against an api, I would, at a minimum, create data classes for all of our outside data dependancies. It feels like there are some established data standards out there for the play-by-play data sources, and pulling them in would be a low effort means to reduce potential ambiguity.
