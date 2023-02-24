@@ -32,7 +32,6 @@ class PbpPlayersByEventHandler:
             elif play['play_id'] == 1 and play['team_id'] == self.away_team:
                 self.away_lineup.append(play['player_id'])
 
-
     def create_player_rows_per_play(self, play: dict, team: str):
         if team == 'home':
             is_anomaly = 1
@@ -48,8 +47,6 @@ class PbpPlayersByEventHandler:
             for player in self.away_lineup:
                 insert_record = (play['event_id'], play['play_id'], self.away_team, player, is_anomaly)
                 self.players_on_court_insert_data.append(insert_record)
-
-
 
     def create_lineup_hashes(self):
         home_sorted_lineup = sorted(self.home_lineup)
@@ -70,7 +67,6 @@ class PbpPlayersByEventHandler:
         away_hash = event_handler.hashing_sql_client.cursor.fetchall()
         return home_hash, away_hash
 
-    # @staticmethod
     def write_hash_to_database(self, play: dict, team_id: int, lineup_hash: int):
         hash_record = (play['event_id'], play['play_id'], team_id, lineup_hash)
         add_hash = ("INSERT INTO players_on_court_hash"
@@ -79,7 +75,6 @@ class PbpPlayersByEventHandler:
         event_handler.hashing_sql_client.cursor.execute(add_hash, hash_record)
         event_handler.hashing_sql_client.cnx.commit()
 
-    # @staticmethod
     def update_and_delete_changed_data_from_database(self, play: dict, team_id: int, lineup_hash: int):
         event_id = play['event_id']
         play_id = play['play_id']
@@ -90,7 +85,6 @@ class PbpPlayersByEventHandler:
         event_handler.hashing_sql_client.cursor.execute(delete_players_on_court)
         event_handler.hashing_sql_client.cnx.commit()
 
-    # @staticmethod
     def run_hash_comparisons_for_team_and_play(self, play: dict, current_lineup_hash: hash, stored_hash_record: hash, team_id: int):
         # skip if the stored lineup hash matches the new lineup hash
         if len(stored_hash_record) > 0 and stored_hash_record == current_lineup_hash:
