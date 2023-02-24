@@ -11,17 +11,20 @@ class PbpPlayersByEventHandler:
         self.last_play_id = None
         self.home_team = None
         self.away_team = None
+        self.teams = []
         self.home_lineup = []
         self.away_lineup = []
         self.set_team_ids()
-        self.players_on_court_insert_data = []
         self.set_starting_lineups()
         self.sql_client = MysqlClient()
         self.hashing_sql_client = MysqlClient()
+        df = {'event_id': [], 'play_id': [], 'team_id': [], 'player_id': [], 'is_anomaly': []}
+        self.players_on_court_insert_data = []
 
     def set_team_ids(self):
         self.home_team = self.pbp_players_by_event[0]['home_team_id']
         self.away_team = self.pbp_players_by_event[0]['away_team_id']
+        self.teams = [self.home_team, self.away_team]
 
     def set_starting_lineups(self):
         for play in self.pbp_players_by_event:
@@ -29,7 +32,7 @@ class PbpPlayersByEventHandler:
                 self.home_lineup.append(play['player_id'])
             elif play['play_id'] == 1 and play['team_id'] == self.away_team:
                 self.away_lineup.append(play['player_id'])
-                break
+
 
     def create_player_rows_per_play(self, play: dict, team: str):
         if team == 'home':
@@ -43,7 +46,7 @@ class PbpPlayersByEventHandler:
             is_anomaly = 1
             if len(self.away_lineup) == 5:
                 is_anomaly = 0
-            for player in self.home_lineup:
+            for player in self.away_lineup:
                 insert_record = (play['event_id'], play['play_id'], self.away_team, player, is_anomaly)
                 self.players_on_court_insert_data.append(insert_record)
 
@@ -90,31 +93,33 @@ class PbpPlayersByEventHandler:
         event_handler.hashing_sql_client.cnx.commit()
 
     # @staticmethod
-    def run_hash_comparisons(self, play: dict, current_lineup_hash: hash, stored_hash_records: hash, team_id: int):
+    def run_hash_comparisons_for_team_and_play(self, play: dict, current_lineup_hash: hash, stored_hash_record: hash, team_id: int):
         # skip if the stored lineup hash matches the new lineup hash
-        if len(stored_hash_records) > 0 and stored_hash_records[0][0] == current_lineup_hash:
+        if len(stored_hash_record) > 0 and stored_hash_record == current_lineup_hash:
             # print('no change - skipping play')
             return 'skip'
         # if no hash exists, write the current hash
-        if len(stored_hash_records) == 0:
+        if len(stored_hash_record) == 0:
             # print('no hash exists - adding')
             event_handler.write_hash_to_database(play, team_id, current_lineup_hash)
             return 'update'
         # If not equal, delete all records for play and update hash
-        if len(stored_hash_records) > 0 and stored_hash_records[0][0] != current_lineup_hash:
-            # 'play updated'
+        if len(stored_hash_record) > 0 and stored_hash_record[0][0] != current_lineup_hash:
             event_handler.update_and_delete_changed_data_from_database(play, team_id, current_lineup_hash)
+            for record in event_handler.players_on_court_insert_data:
+                if record[0] == play['event_id'] and record[1] == play['play_id'] and record[2] == team_id:
+                    event_handler.players_on_court_insert_data.remove(record)
             return 'update'
 
     def compare_and_update_home_and_away_hashes(self, play):
         stored_home_hash, stored_away_hash = self.query_play_hash_from_database(play)
         home_lineup_hash, away_lineup_hash = self.create_lineup_hashes()
-        home_comparison_result = self.run_hash_comparisons(play, home_lineup_hash,
-                                                                    stored_home_hash,
-                                                                    self.home_team)
-        away_comparison_result = self.run_hash_comparisons(play, away_lineup_hash,
-                                                                    stored_away_hash,
-                                                                    self.away_team)
+        home_comparison_result = self.run_hash_comparisons_for_team_and_play(play, home_lineup_hash,
+                                                                             stored_home_hash,
+                                                                             self.home_team)
+        away_comparison_result = self.run_hash_comparisons_for_team_and_play(play, away_lineup_hash,
+                                                                             stored_away_hash,
+                                                                             self.away_team)
         # then write new records for play
         if home_comparison_result == 'update':
             self.create_player_rows_per_play(play, 'home')
@@ -152,7 +157,7 @@ if __name__ == "__main__":
     del raw_data
     df = df.astype({'event_id': 'Int64', 'player_id': 'Int64', 'home_team_id': 'Int64', 'away_team_id': 'Int64',
                     'team_id': 'Int64', 'play_id': 'Int64', 'play_event_id': 'Int64', 'play_sequence': 'Int64'})
-    df = df.sort_values(by=['event_id', 'play_id', 'play_sequence'], ascending=True)
+    df = df.sort_values(by=['event_id', 'play_id', 'play_sequence'], ascending=[True, True, False])
     df['team_id'] = df['team_id'].fillna(0)
     if len(sys.argv) > 1:
         event_ids = [int(sys.argv[1])]
@@ -165,16 +170,17 @@ if __name__ == "__main__":
         event_handler = PbpPlayersByEventHandler(event_data_dict)
 
         for play in event_handler.pbp_players_by_event:
-            # Handle lineup for initial play
 
+            # Handle lineup for initial play
             if play['play_id'] == 1 and play['play_sequence'] == 1 and event_handler.last_play_id is None:
                 event_handler.compare_and_update_home_and_away_hashes(play)
 
+            # Handle records that didn't have team_id
             if play['team_id'] == 0:
                 event_handler.compare_and_update_home_and_away_hashes(play)
 
             # remove outgoing substituted player
-            if play['play_event_id'] == 10 and play['play_sequence'] == 1:
+            if play['play_event_id'] == 10 and play['play_sequence'] == 2:
                 if play['team_id'] == event_handler.home_team:
                     if play['player_id'] in event_handler.home_lineup:
                         event_handler.home_lineup.remove(play['player_id'])
@@ -182,34 +188,25 @@ if __name__ == "__main__":
                     if play['player_id'] in event_handler.away_lineup:
                         event_handler.away_lineup.remove(play['player_id'])
 
+            # add incoming substituted player and create records
+            if play['play_event_id'] == 10 and play['play_sequence'] == 1:
+                if play['team_id'] == event_handler.home_team and play['player_id'] not in event_handler.home_lineup:
+                    event_handler.home_lineup.append(play['player_id'])
+                elif play['team_id'] == event_handler.away_team and play['player_id'] not in event_handler.away_lineup:
+                    event_handler.away_lineup.append(play['player_id'])
+                event_handler.compare_and_update_home_and_away_hashes(play)
+
             # Add player to lineup if doesn't exist
-            if play['play_id'] > 1:
-                stored_hash_records = event_handler.query_play_hash_from_database(play)
-                home_lineup_hash = event_handler.create_lineup_hashes()[0]
-                away_lineup_hash = event_handler.create_lineup_hashes()[1]
-                home_comparison_result = 'skip'
-                away_comparison_result = 'skip'
-                if play['team_id'] != 0 and play['team_id'] == event_handler.home_team:
-                    if play['player_id'] not in event_handler.home_lineup:
-                        event_handler.home_lineup.append(play['player_id'])
-                    new_home_lineup_hash = event_handler.create_lineup_hashes()[0]
-                    home_comparison_result = event_handler.run_hash_comparisons(play, new_home_lineup_hash,
-                                                                           stored_hash_records[0], play['team_id'])
-                elif play['team_id'] != 0 and play['team_id'] == event_handler.away_team:
-                    if play['player_id'] not in event_handler.away_lineup:
-                        event_handler.away_lineup.append(play['player_id'])
-                    new_away_lineup_hash = event_handler.create_lineup_hashes()[1]
-                    away_comparison_result = event_handler.run_hash_comparisons(play, new_away_lineup_hash,
-                                                                           stored_hash_records[1], play['team_id'])
-                # then write new records for play
-                if home_comparison_result == 'update':
-                    event_handler.create_player_rows_per_play(play, event_handler.home_team)
-                if away_comparison_result == 'update':
-                    event_handler.create_player_rows_per_play(play, event_handler.away_team)
+            if play['play_id'] > 1 and play['team_id'] > 0 and play['play_event_id'] != 10:
+                if play['team_id'] == event_handler.home_team and play['player_id'] not in event_handler.home_lineup:
+                    event_handler.home_lineup.append(play['player_id'])
+                if play['team_id'] == event_handler.away_team and play['player_id'] not in event_handler.away_lineup:
+                    event_handler.away_lineup.append(play['player_id'])
+                event_handler.compare_and_update_home_and_away_hashes(play)
 
         for play in event_handler.players_on_court_insert_data:
             add_game = ("INSERT INTO pbp_players_on_court "
-                        "(event_id, play_id, player_id) "
-                        "VALUES (%s, %s, %s)")
+                        "(event_id, play_id, team_id, player_id, is_anomaly) "
+                        "VALUES (%s, %s, %s, %s, %s)")
             event_handler.sql_client.cursor.execute(add_game, play)
         event_handler.sql_client.write_records_and_close_connection()
