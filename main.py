@@ -15,8 +15,6 @@ class PbpPlayersByEventHandler:
         self.away_lineup = []
         self.set_team_ids()
         self.set_starting_lineups()
-        self.sql_client = MysqlClient()
-        self.hashing_sql_client = MysqlClient()
         self.players_on_court_insert_data = []
 
     def set_team_ids(self):
@@ -159,6 +157,7 @@ if __name__ == "__main__":
         event_handler = PbpPlayersByEventHandler(event_data_dict)
 
         for play in event_handler.pbp_players_by_event:
+            event_handler.hashing_sql_client = MysqlClient()
 
             # Handle lineup for initial play
             if play['play_id'] == 1 and play['play_sequence'] == 1:
@@ -193,6 +192,7 @@ if __name__ == "__main__":
                     event_handler.away_lineup.append(play['player_id'])
                 event_handler.compare_and_update_home_and_away_hashes(play)
 
+        event_handler.sql_client = MysqlClient()
         for play in event_handler.players_on_court_insert_data:
             add_game = ("INSERT INTO pbp_players_on_court "
                         "(event_id, play_id, team_id, player_id, is_anomaly) "

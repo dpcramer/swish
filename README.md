@@ -24,7 +24,6 @@ The intention of the PbpPlayersByEventHandler class is to take in a complete dic
 The class assumes that the input values are pre-sorted in order by of play_id asc, then sequence_id desc (sorting is handled in the pre-processing).
 
 Upon instantiation, the Handler sets the initial starting lineups for each team with the set_starting_lineup() method. 
-It also creates two separate MySQL clients - one to be used for the bulk insert of records into the PBP_Players_On_Court ('sql_client'). The other is used for making smaller one-off calls as part of the hashing process ('hashing_sql_client').
 
 To lower database overhead the PBP_Players_On_Court values are inserted in a single job at the very end. 
 The PbpPlayersByEventHandler.players_on_court_insert_data list variable is where the records are stored during processing.
