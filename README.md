@@ -7,6 +7,8 @@ You may pass a event_id as an argument to process only a single game:
 
 $ python main.py 1947160
 
+git history can be found at: https://github.com/dpcramer/swish
+
 ## Data Structure
 I'm assuming that the destination warehouse will have raw data tables for all three files: pbp_players, pbp, and rosters. To make aggregate functions as easy possible, I am inserting an entry into the table for each event_id-play_id-player_id combination.
 
